@@ -1,6 +1,3 @@
-From 0aefc3175b8becdd7d4e2c09aaa24bf2b0a17d7f Mon Sep 17 00:00:00 2001
-From: Ronit Halder <ronit.crj@gmail.com>
-Date: Thu, 11 Aug 2016 18:19:19 +0530
 Subject: [RFC 1/4] Creating one or two CMA area at Boot time
 
 This patch create CMA area(s) at boot time. In case of x86_32

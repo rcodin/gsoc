@@ -1,6 +1,3 @@
-From 34e277851c640b076eb81f82bd442a7df86161ff Mon Sep 17 00:00:00 2001
-From: Ronit Halder <ronit.crj@gmail.com>
-Date: Thu, 11 Aug 2016 18:47:14 +0530
 Subject: [RFC 0/4] Kexec: Enable run time memory resrvation of crash kernel
 
 Currenty linux kernel reserves memory at the boot time for crash kernel.
