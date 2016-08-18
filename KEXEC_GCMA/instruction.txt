@@ -1,0 +1,10 @@
+The kexec dynmaic memory allocation patch based on CMA (Contiguous Memory Allocator). But, the CMA is dependent on page migration. CMA uses movable pages and movable pages become unmovable temporarily. That's why the CMA fells to allocate pages sometimes. This patch is based on GCMA (Guaranteed Contiguous Memory Allocator). In GCMA memory allocation is guaranteed. GCMA is a different approach in which uses easily discardable pages instead movable pages.
+There is a RFC patch based on GCMA approach of kernel version v3.18.
+
+https://lkml.org/lkml/2015/2/23/480
+
+This patch is made based on the patch mentioned above. Please apply the patch above before applying this patch.
+
+Unlike KEXEC_CMA patch this will be allocated automatically
+
+This will be used same as the patch KEXEC_CMA.

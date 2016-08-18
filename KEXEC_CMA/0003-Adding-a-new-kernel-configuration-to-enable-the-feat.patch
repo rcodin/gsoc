@@ -1,0 +1,32 @@
+From b544240c4d8b04f69780dbed235e88e73a1f1848 Mon Sep 17 00:00:00 2001
+From: Ronit Halder <ronit.crj@gmail.com>
+Date: Thu, 11 Aug 2016 18:43:55 +0530
+Subject: [RFC 3/4] Adding a new kernel configuration to enable the feature
+
+Kernel configuration option added to enable run time memory reservation
+feature for kexec.
+
+Signed-off-by: Ronit Halder <ronit.crj@gmail.com>
+
+---
+ mm/Kconfig | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/mm/Kconfig b/mm/Kconfig
+index 97a4e06..8b1533d 100644
+--- a/mm/Kconfig
++++ b/mm/Kconfig
+@@ -668,3 +668,9 @@ config ZONE_DEVICE
+ 
+ config FRAME_VECTOR
+ 	bool
++config KEXEC_CMA
++	bool "Use CMA for Kexec crash kernel"
++	depends on CMA
++	help
++	  This configuration option is to use CMA for Kexec.
++	  CMA helps us to allocate memory for crash kernel at runtime.
+\ No newline at end of file
+-- 
+2.9.0.GIT
+

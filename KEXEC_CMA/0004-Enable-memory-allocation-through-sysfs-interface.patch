@@ -1,0 +1,58 @@
+From 34e277851c640b076eb81f82bd442a7df86161ff Mon Sep 17 00:00:00 2001
+From: Ronit Halder <ronit.crj@gmail.com>
+Date: Thu, 11 Aug 2016 18:44:34 +0530
+Subject: [RFC 4/4] Enable memory allocation through sysfs interface
+
+Modify the sysfs entry "kernel/kexec_crash_size" to allocate or
+release memory at run time. The memory size will be written to
+the entry in MB. If the user uses high memory (in x86_64). Then
+size will be only set for high memory. The low memory will be
+allocated automatically. If the size set is zero, the both the
+allocated region in low and high memory will be released.
+
+Signed-off-by: Ronit Halder <ronit.crj@gmail.com>
+
+---
+ kernel/ksysfs.c | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/kernel/ksysfs.c b/kernel/ksysfs.c
+index e83b264..4cc286d 100644
+--- a/kernel/ksysfs.c
++++ b/kernel/ksysfs.c
+@@ -116,10 +116,31 @@ static ssize_t kexec_crash_size_store(struct kobject *kobj,
+ {
+ 	unsigned long cnt;
+ 	int ret;
++	int size;
+ 
+ 	if (kstrtoul(buf, 0, &cnt))
+ 		return -EINVAL;
+-
++#ifdef CONFIG_KEXEC_CMA
++#ifdef CONFIG_X86
++	size = cnt << 20;
++	if (cnt == 0) {
++		crash_free_memory_low();
++		ret = crash_free_memory(crash_get_memory_size());
++	} else if (cnt > 0) {
++		if (!crash_get_memory_size_low() && crash_alloc_memory_low())
++			return -ENOMEM;
++		ret = crash_free_memory(crash_get_memory_size());
++		if (ret)
++			return ret;
++		ret = crash_alloc_memory(size);
++		if (ret)
++			return ret;
++	} else {
++		return -EINVAL;
++	}
++	return count;
++#endif
++#endif
+ 	ret = crash_shrink_memory(cnt);
+ 	return ret < 0 ? ret : count;
+ }
+-- 
+2.9.0.GIT
+

@@ -1,0 +1,234 @@
+From 516f79f3c6e27926671bb5aebcbaf2e08a4bc8e3 Mon Sep 17 00:00:00 2001
+From: Ronit Halder <ronit.crj@gmail.com>
+Date: Sat, 30 Jul 2016 16:31:37 +0530
+Subject: [PATCH] Kexec GCMA patch on kernel v3.18
+
+---
+ arch/x86/kernel/setup.c | 33 +++++++++++++++-----
+ include/linux/kexec.h   |  8 +++++
+ kernel/kexec.c          | 81 +++++++++++++++++++++++++++++++++++++++++++++++++
+ kernel/ksysfs.c         | 14 +++++++--
+ 4 files changed, 126 insertions(+), 10 deletions(-)
+
+diff --git a/arch/x86/kernel/setup.c b/arch/x86/kernel/setup.c
+index ab08aa2..ab80698 100644
+--- a/arch/x86/kernel/setup.c
++++ b/arch/x86/kernel/setup.c
+@@ -111,6 +111,9 @@
+ #include <asm/alternative.h>
+ #include <asm/prom.h>
+ 
++//my
++#include <linux/cma.h>
++
+ /*
+  * max_low_pfn_mapped: highest direct mapped pfn under 4GB
+  * max_pfn_mapped:     highest direct mapped pfn over 4GB
+@@ -118,6 +121,12 @@
+  * The direct mapping only covers E820_RAM regions, so the ranges and gaps are
+  * represented by pfn_mapped
+  */
++
++//my
++struct cma *crashk_cma;
++struct cma *crashk_cma_low;
++
++
+ unsigned long max_low_pfn_mapped;
+ unsigned long max_pfn_mapped;
+ 
+@@ -555,14 +564,18 @@ static void __init reserve_crashkernel_low(void)
+ 		return;
+ 	}
+ 
+-	memblock_reserve(low_base, low_size);
++	ret =  cma_declare_contiguous(low_base, low_size, 0, 1<<20, 0, 1, &crashk_cma_low);
++
++	if (ret)
++		pr_err("%s: Error reserving CMA area for crashkernel low.\n", __func__);
++
+ 	pr_info("Reserving %ldMB of low memory at %ldMB for crashkernel (System low RAM: %ldMB)\n",
+ 			(unsigned long)(low_size >> 20),
+ 			(unsigned long)(low_base >> 20),
+ 			(unsigned long)(total_low_mem >> 20));
+-	crashk_low_res.start = low_base;
+-	crashk_low_res.end   = low_base + low_size - 1;
+-	insert_resource(&iomem_resource, &crashk_low_res);
++	// crashk_low_res.start = low_base;
++	// crashk_low_res.end   = low_base + low_size - 1;
++	// insert_resource(&iomem_resource, &crashk_low_res);
+ #endif
+ }
+ 
+@@ -613,7 +626,11 @@ static void __init reserve_crashkernel(void)
+ 			return;
+ 		}
+ 	}
+-	memblock_reserve(crash_base, crash_size);
++	ret =  cma_declare_contiguous(crash_base, crash_size, 0, 1<<20, 0, 1, &crashk_cma);
++	if (ret) {
++		pr_err("%s: Error reserving CMA area for crashkernel.\n", __func__);
++		return;
++	}
+ 
+ 	printk(KERN_INFO "Reserving %ldMB of memory at %ldMB "
+ 			"for crashkernel (System RAM: %ldMB)\n",
+@@ -621,9 +638,9 @@ static void __init reserve_crashkernel(void)
+ 			(unsigned long)(crash_base >> 20),
+ 			(unsigned long)(total_mem >> 20));
+ 
+-	crashk_res.start = crash_base;
+-	crashk_res.end   = crash_base + crash_size - 1;
+-	insert_resource(&iomem_resource, &crashk_res);
++	// crashk_res.start = crash_base;
++	// crashk_res.end   = crash_base + crash_size - 1;
++	// insert_resource(&iomem_resource, &crashk_res);
+ 
+ 	if (crash_base >= (1ULL<<32))
+ 		reserve_crashkernel_low();
+diff --git a/include/linux/kexec.h b/include/linux/kexec.h
+index 9d957b7..50c1667 100644
+--- a/include/linux/kexec.h
++++ b/include/linux/kexec.h
+@@ -314,3 +314,11 @@ static inline void crash_kexec(struct pt_regs *regs) { }
+ static inline int kexec_should_crash(struct task_struct *p) { return 0; }
+ #endif /* CONFIG_KEXEC */
+ #endif /* LINUX_KEXEC_H */
++
++extern struct cma *crashk_cma, *crashk_cma_low;
++
++int crash_free_memory(unsigned int size);
++int crash_alloc_memory(unsigned int size);
++int crash_alloc_memory_low(void);
++int crash_free_memory_low(void);
++size_t crash_get_memory_size_low(void);
+\ No newline at end of file
+diff --git a/kernel/kexec.c b/kernel/kexec.c
+index 2abf9f6..2dcecbe 100644
+--- a/kernel/kexec.c
++++ b/kernel/kexec.c
+@@ -44,6 +44,10 @@
+ 
+ #include <crypto/hash.h>
+ #include <crypto/sha.h>
++//my
++#include <linux/cma.h>
++static struct page *pages, *pages_low;
++DEFINE_MUTEX(kexec_mutex_low);
+ 
+ /* Per cpu memory for storing cpu states in case of system crash. */
+ note_buf_t __percpu *crash_notes;
+@@ -2768,3 +2772,80 @@ int kernel_kexec(void)
+ 	mutex_unlock(&kexec_mutex);
+ 	return error;
+ }
++
++int crash_free_memory(unsigned int size)
++{
++	int ret;
++
++	if (!crashk_cma)
++		return 0;
++	ret = cma_release(crashk_cma, pages, size >> PAGE_SHIFT);
++
++	if (!ret) {
++		pr_info("Crash memory release failed");
++		return 0;
++	}
++	release_resource(&crashk_res);
++	return 1;
++}
++
++int crash_alloc_memory(unsigned int size)
++{
++	if (!crashk_cma)
++		return 0;
++	pages = cma_alloc(crashk_cma, size >> PAGE_SHIFT, KEXEC_CRASH_MEM_ALIGN);
++
++	if (!pages) {
++		pr_info("Memory for crash kernel not allocated");
++		return 0;
++	}
++
++	crashk_res.start = page_to_pfn(pages) << PAGE_SHIFT;
++	crashk_res.end = crashk_res.start + size - 1;
++	insert_resource(&iomem_resource, &crashk_res);
++	return 1;
++}
++
++int crash_free_memory_low(void)
++{
++	int ret;
++
++	if (!crashk_cma_low)
++		return 0;
++	ret = cma_release(crashk_cma_low, pages_low, cma_get_size(crashk_cma_low) >> PAGE_SHIFT);
++
++	if (!ret) {
++		pr_info("Crash low memory release failed");
++		return 0;
++	}
++	release_resource(&crashk_low_res);
++	return 1;
++}
++
++int crash_alloc_memory_low(void)
++{
++	if (!crashk_cma_low)
++		return 0;
++	pages = cma_alloc(crashk_cma_low, cma_get_size(crashk_cma_low) >> PAGE_SHIFT, KEXEC_CRASH_MEM_ALIGN);
++
++	if (!pages) {
++		pr_info("Low memory for crash kernel not allocated");
++		return 0;
++	}
++
++	crashk_low_res.start = page_to_pfn(pages) << PAGE_SHIFT;
++	crashk_low_res.end = crashk_low_res.start + cma_get_size(crashk_cma_low) - 1;
++	insert_resource(&iomem_resource, &crashk_low_res);
++	return 1;
++}
++
++size_t crash_get_memory_size_low(void)
++{
++	size_t size = 0;
++
++	mutex_lock(&kexec_mutex_low);
++	if (crashk_low_res.end != crashk_low_res.start)
++		size = resource_size(&crashk_low_res);
++	mutex_unlock(&kexec_mutex_low);
++	return size;
++}
+\ No newline at end of file
+diff --git a/kernel/ksysfs.c b/kernel/ksysfs.c
+index 6683cce..4750a9a 100644
+--- a/kernel/ksysfs.c
++++ b/kernel/ksysfs.c
+@@ -116,12 +116,22 @@ static ssize_t kexec_crash_size_store(struct kobject *kobj,
+ {
+ 	unsigned long cnt;
+ 	int ret;
++	int size;
+ 
+ 	if (kstrtoul(buf, 0, &cnt))
+ 		return -EINVAL;
+ 
+-	ret = crash_shrink_memory(cnt);
+-	return ret < 0 ? ret : count;
++	size = cnt<<20;
++	if (cnt == 0) {
++		crash_free_memory_low();
++		ret = crash_free_memory(crash_get_memory_size());
++	} else if (cnt > 0) {
++		if (crash_get_memory_size_low() == 0)
++			crash_alloc_memory_low();
++		ret = crash_free_memory(crash_get_memory_size());
++		ret = crash_alloc_memory(size);
++	}
++	return count;
+ }
+ KERNEL_ATTR_RW(kexec_crash_size);
+ 
+-- 
+1.9.1
+
