@@ -12,4 +12,5 @@ There is a alternative approach called GCMA (Guaranteed contiguous memory alloca
 options
 
 CONFIG_GCMA=y
+
 CONFIG_GCMA_DEFAULT=y
