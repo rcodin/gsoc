@@ -22,4 +22,4 @@ https://github.com/sjp38/linux.gcma/tree/gcma/rfc/v2
 
 ***This is the link to blog posts related to gsoc.
 
-http://ronithalder.blogspot.in/
+http://ronithalder.blogspot.in/search/label/fedora
