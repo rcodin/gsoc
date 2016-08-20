@@ -14,6 +14,12 @@ CONFIG_GCMA=y
 
 CONFIG_GCMA_DEFAULT=y
 
-This is the link to blog posts related to gsoc.
+
+The link to GCMA patch repository is given below:
+
+https://github.com/sjp38/linux.gcma/tree/gcma/rfc/v2
+
+
+***This is the link to blog posts related to gsoc.
 
 http://ronithalder.blogspot.in/
