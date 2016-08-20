@@ -16,3 +16,5 @@ CONFIG_GCMA=y
 CONFIG_GCMA_DEFAULT=y
 
 This is the link to blog posts related to gsoc.
+
+http://ronithalder.blogspot.in/
