@@ -1,6 +1,5 @@
 # gsoc
-The folder KEXEC_CMA contains the patch set of KEXEC crash kernel memory reservation using CMA. This patch enable us
-to reserve memory for use of crash kernel in run time instead of boot time. This is five patch patchset. This patch is also submitted to linux kernel community. The link of the patch in lkml mailing list given below:
+The directory KEXEC_CMA contains the patch set of KEXEC crash kernel memory reservation using CMA (Contiguous Memory Allocator). There is also instruction of how to use the patch.This patch enable us to reserve memory for use of crash kernel in run time instead of boot time. This is five patch patchset. This patch is also submitted to linux kernel community. The link of the patch in lkml mailing list given below:
 
 https://lkml.org/lkml/2016/8/12/263
 
